@@ -1,0 +1,11 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: model
+spec:
+  predictor:
+    sklearn:
+      storageUri: "s3://models/trained_model_updated.pkl"  # MinIO에 저장된 재학습된 모델 경로
+      runtimeVersion: "v0.5.1"  # scikit-learn의 KServe runtime 버전
+    minReplicas: 1  # 최소 인스턴스 수
+    maxReplicas: 5  # 최대 인스턴스 수

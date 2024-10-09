@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:latest
+          args:
+            - server
+            - /data
+            - --console-address
+            - ":9090"                     # 웹 UI를 9090 포트에서 실행
+          env:
+            - name: MINIO_ROOT_USER
+              value: "minioadmin"          # 기본 관리자 계정
+            - name: MINIO_ROOT_PASSWORD
+              value: "minioadmin"          # 기본 비밀번호
+          ports:
+            - containerPort: 9000          # API 용 포트
+            - containerPort: 9090          # 웹 UI 용 포트
+          volumeMounts:
+            - name: storage
+              mountPath: /data
+      volumes:
+        - name: storage
+          emptyDir: {}

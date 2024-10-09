@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: model-retrain-job
+spec:
+  template:
+    spec:
+      containers:
+        - name: model-retrain
+          image: vamlin/my-model:1.0.2  # Updated Docker image tag
+          imagePullPolicy: Always  # Ensures Kubernetes pulls the latest image
+          args: ["python", "es_log_train_model.py"]  # 재학습 스크립트 실행
+          volumeMounts:
+            - name: data-volume
+              mountPath: /data
+          env:
+            - name: MINIO_ACCESS_KEY
+              value: "minioadmin"
+            - name: MINIO_SECRET_KEY
+              value: "minioadmin"
+      volumes:
+        - name: data-volume
+          emptyDir: {}  # 재학습 시 사용할 임시 데이터 저장소
+      restartPolicy: Never  # 재학습 작업은 한 번 실행되며 반복되지 않음
+  backoffLimit: 4  # Optional: Retry limit before considering the job failed
