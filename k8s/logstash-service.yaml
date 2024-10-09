@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: logstash-service
+spec:
+  selector:
+    app: logstash
+  ports:
+    - protocol: TCP
+      port: 5044   # 외부에서 접근하는 서비스 포트
+      targetPort: 5044 # Logstash 컨테이너에서 사용하는 포트

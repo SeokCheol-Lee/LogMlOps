@@ -1,12 +1,23 @@
 <configuration>
-  <appender name="KAFKA" class="com.github.danielwegener.logback.kafka.KafkaAppender">
-    <topic>game-logs</topic>
-    <bootstrapServers>kafka-service:9092</bootstrapServers>
-    <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>/var/log/log-server/log.log</file>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <fileNamePattern>/var/log/log-server/log.%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>30</maxHistory>
+    </rollingPolicy>
+    <encoder>
       <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level %msg%n</pattern>
     </encoder>
   </appender>
+  <logger name="PlayerActive" level="info">
+    <appender-ref ref="FILE" />
+  </logger>
   <root level="INFO">
-    <appender-ref ref="KAFKA" />
+    <appender-ref ref="CONSOLE" />
   </root>
 </configuration>

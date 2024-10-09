@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class LogController {
 
-    private static final Logger logger = LoggerFactory.getLogger(LogController.class);
+    private static final Logger logger = LoggerFactory.getLogger("PlayerActive");
 
     @PostMapping("/action")
     public ResponseEntity<String> playerAction(@RequestBody ActionData actionData) {

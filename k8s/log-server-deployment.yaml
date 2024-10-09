@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: log-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: log-server
+  template:
+    metadata:
+      labels:
+        app: log-server
+    spec:
+      containers:
+        - name: log-server
+          image: vamlin/log-server:1.0.1
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: log-volume
+              mountPath: /var/log/log-server
+      volumes:
+        - name: log-volume
+          hostPath:
+            path: /var/log/log-server
+            type: DirectoryOrCreate

@@ -1,0 +1,26 @@
+apiVersion: "sparkoperator.k8s.io/v1beta2"
+kind: SparkApplication
+metadata:
+  name: log-processing
+spec:
+  type: Python
+  pythonVersion: "3"
+  mode: cluster
+  image: vamlin/my-spark:1.0.0
+  mainApplicationFile: local:///opt/spark/scripts/log_processing.py  # 수정된 경로 (컨테이너 내부 경로)
+  sparkConf:
+    "spark.pyspark.python": "/usr/bin/python3"  # Python 실행 파일 경로
+    "spark.pyspark.driver.python": "/usr/bin/python3"  # 드라이버에서 사용할 Python 경로
+  restartPolicy:
+    type: Never
+  driver:
+    cores: 1
+    memory: "1g"
+    serviceAccount: spark  # 생성된 서비스 어카운트 사용
+  executor:
+    cores: 1
+    instances: 2
+    memory: "2g"
+    env:
+      - name: PYSPARK_PYTHON
+        value: "/usr/bin/python3"  # 환경 변수 설정

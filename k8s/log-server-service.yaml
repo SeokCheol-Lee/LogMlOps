@@ -4,7 +4,7 @@ metadata:
   name: log-server-service
 spec:
   selector:
-    app: game-server
+    app: log-server
   ports:
     - protocol: TCP
       port: 8080
