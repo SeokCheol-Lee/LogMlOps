@@ -1,85 +1,103 @@
 import pandas as pd
-import os
-import random
+import numpy as np
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
-import joblib
-from minio import Minio
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report
+from elasticsearch7 import Elasticsearch
+from datetime import datetime, timedelta
+from pytz import timezone
+import boto3
+from botocore.client import Config
+import pickle
 
-# 1. MinIO 서버에 연결
-minioClient = Minio(
-    '192.168.49.2:30000',  # MinIO 서버의 IP와 포트
-    access_key='minioadmin',  # MinIO 액세스 키
-    secret_key='minioadmin',  # MinIO 비밀 키
-    region='ap-northeast-2',  # MinIO의 리전 설정
-    secure=False  # HTTPS를 사용하지 않음 (로컬 환경)
-)
+# 1. 테스트용 데이터 생성 (훈련 데이터를 위한 가상 데이터)
+np.random.seed(42)
+player_ids = [f'player_{i}' for i in range(1, 101)]  # 100명의 플레이어
 
-# 2. 로그 데이터를 랜덤하게 생성하는 함수 (최초 학습용)
-def generate_random_logs(num_players, num_logs_per_player):
-    logs = []
-    actions = ["MOVE", "JUMP", "SHOOT", "RUN"]  # 행동 타입 목록
-    for player_id in range(1, num_players + 1):
-        for _ in range(num_logs_per_player):
-            action = random.choice(actions)  # 무작위로 행동을 선택
-            timestamp = pd.Timestamp.now().timestamp()  # 현재 타임스탬프 생성
-            logs.append({
-                "playerId": player_id,  # 플레이어 ID
-                "actionType": action,  # 행동 타입
-                "timestamp": int(timestamp)  # 타임스탬프 (정수형 변환)
-            })
-    return logs
+# 각 플레이어의 액션 카운트 및 액션 타입 생성
+action_counts = np.random.randint(1, 50, size=100)
+action_types = [np.random.choice(['move', 'attack', 'defend'], size=np.random.randint(1, 5), replace=True).tolist() for _ in range(100)]
 
-# 3. 로그 데이터를 생성하고 DataFrame으로 변환
-random_logs = generate_random_logs(num_players=100, num_logs_per_player=20)
-log_df = pd.DataFrame(random_logs)
+# 마지막 액션 시점 생성 (현재 시점으로부터 최대 30일 전, 랜덤하게)
+current_time = datetime.now()
+last_action_timestamps = [current_time - timedelta(days=np.random.randint(0, 30)) for _ in range(100)]
 
-# 4. playerId별 로그 횟수를 계산하여 학습 데이터 생성
-player_log_counts = log_df.groupby("playerId").size().reset_index(name="log_count")
+# 이탈 여부 레이블링 (예: 최근 7일 동안 활동이 없으면 이탈로 간주, 랜덤성 추가)
+recency = [(current_time - ts).days for ts in last_action_timestamps]
+churn = [1 if r > 7 else 0 for r in recency]
 
-# 로그 횟수에 기반한 레벨 생성 (랜덤성을 포함)
-player_levels = player_log_counts.copy()
-player_levels["level"] = player_log_counts["log_count"].apply(
-    lambda x: min(100, max(1, int(x + random.gauss(0, 5))))  # Gaussian 노이즈 추가
-)
+# 일부 데이터를 랜덤하게 뒤섞어 정확한 분류가 어렵게 함으로써 랜덤성 부여
+random_noise = np.random.binomial(1, 0.1, size=100)  # 10% 확률로 레이블을 뒤바꿈
+churn = [1 - val if noise == 1 else val for val, noise in zip(churn, random_noise)]
 
-# 5. 모델 학습을 위한 데이터 분리
-X = player_levels[["log_count"]]  # feature: 로그 횟수
-y = player_levels["level"]  # target: 레벨
+# DataFrame 생성
+data = pd.DataFrame({
+    'playerId': player_ids,
+    'action_count': action_counts,
+    'last_action': last_action_timestamps,
+    'recency': recency,
+    'churn': churn
+})
 
+# 각 액션 타입별 카운트 계산 (dummy data로 생성)
+action_type_counts = pd.DataFrame([{action: np.random.randint(0, 10) for action in ['move', 'attack', 'defend']} for _ in range(100)])
+action_type_counts['playerId'] = player_ids
+
+# 특징 데이터 결합
+features = data.merge(action_type_counts, on='playerId')
+
+# 모델 입력 변수와 타겟 변수 정의
+X = features.drop(columns=['playerId', 'churn', 'last_action'])
+y = features['churn']
+
+# 3. 데이터 분할
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# 6. Linear Regression 모델 학습
-model = LinearRegression()
-model.fit(X_train, y_train)
+# 4. 데이터 스케일링
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# 7. 모델 평가 (MSE 계산)
-y_pred = model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
-print(f"Initial Model MSE: {mse:.2f}")  # 최초 학습 모델의 MSE 출력
+# 5. 모델 정의 및 학습
+model = LogisticRegression(random_state=42)
+model.fit(X_train_scaled, y_train)
 
-# 8. MinIO에 버킷이 없으면 생성
-bucket_name = "models"
-found = minioClient.bucket_exists(bucket_name)
-if not found:
-    minioClient.make_bucket(bucket_name)
-    print(f"Bucket '{bucket_name}' created successfully.")  # 버킷 생성 메시지
-else:
-    print(f"Bucket '{bucket_name}' already exists.")  # 버킷이 이미 존재하는 경우
+# 6. 모델 평가
+y_pred = model.predict(X_test_scaled)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy:.2f}")
+print(classification_report(y_test, y_pred))
 
-# 9. 학습된 모델을 로컬에 저장
-local_model_dir = os.path.expanduser("~/models")  # 홈 디렉토리 내에 모델 디렉토리 설정
-local_model_path = os.path.join(local_model_dir, "trained_model_initial.pkl")  # 모델 파일 경로
+# 7. 모델 저장 (MinIO에 저장)
+# MinIO 설정
+minio_endpoint = 'http://192.168.49.2:31433'
+access_key = 'minioadmin'
+secret_key = 'minioadmin'
 
-# 경로가 없으면 디렉토리 생성
-if not os.path.exists(local_model_dir):
-    os.makedirs(local_model_dir)
-    print(f"Directory '{local_model_dir}' created successfully.")  # 디렉토리 생성 메시지
+s3 = boto3.client('s3',
+                  endpoint_url=minio_endpoint,
+                  aws_access_key_id=access_key,
+                  aws_secret_access_key=secret_key,
+                  config=Config(signature_version='s3v4'),
+                  region_name='us-east-1')
 
-# 학습된 모델을 로컬에 저장
-joblib.dump(model, local_model_path)
+# 모델을 로컬에 저장
+with open('/tmp/saved_model.pkl', 'wb') as f:
+    pickle.dump(model, f)
 
-# 10. 저장된 모델을 MinIO에 업로드
-minioClient.fput_object(bucket_name, "trained_model_initial.pkl", local_model_path)
-print("Model uploaded to MinIO successfully.")  # 모델 업로드 성공 메시지
+# MinIO에 업로드
+bucket_name = 'models'
+model_file_path = '/tmp/saved_model.pkl'
+model_object_name = 'churn_model.pkl'
+
+# 버킷이 존재하지 않으면 생성
+try:
+    s3.head_bucket(Bucket=bucket_name)
+except Exception as e:
+    s3.create_bucket(Bucket=bucket_name)
+
+# 모델 파일 업로드
+s3.upload_file(model_file_path, bucket_name, model_object_name)
+
+print("Model saved and uploaded to MinIO successfully.")

@@ -1,15 +1,15 @@
 import pandas as pd
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
 from sklearn.model_selection import train_test_split
-from elasticsearch import Elasticsearch
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report
+from elasticsearch7 import Elasticsearch
 from datetime import datetime, timedelta
+from pytz import timezone
 import boto3
 from botocore.client import Config
-import tarfile
-from pytz import timezone
+import pickle
 
 # 1. Elasticsearch에서 데이터 로드
 es = Elasticsearch(hosts=["192.168.49.2:32377"])
@@ -35,7 +35,7 @@ query_body = {
 }
 
 # 데이터 검색 (query와 size 파라미터로 수정)
-res = es.search(index=index_name, query=query_body, scroll='2m', size=10000)
+res = es.search(index="logs", query=query_body, scroll='2m', size=10000)
 scroll_id = res['_scroll_id']
 hits = res['hits']['hits']
 
@@ -85,6 +85,10 @@ features = features.merge(last_action[['playerId', 'recency']], on='playerId')
 features['churn'] = features['recency'] > 7  # True/False 값을 1/0으로 변환
 features['churn'] = features['churn'].astype(int)
 
+# 클래스 확인 및 최소 두 개의 클래스가 존재하도록 필터링
+if features['churn'].nunique() < 2:
+    raise ValueError("데이터에 최소 두 개의 클래스(이탈/비이탈)가 필요합니다. 데이터에 이탈/비이탈 모두 포함되었는지 확인하세요.")
+
 # 모델 입력 변수와 타겟 변수 정의
 X = features.drop(columns=['playerId', 'churn'])
 y = features['churn']
@@ -92,24 +96,26 @@ y = features['churn']
 # 3. 데이터 분할
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# 4. 모델 정의
-model = Sequential([
-    Dense(64, activation='relu', input_shape=(X_train.shape[1],)),
-    Dense(32, activation='relu'),
-    Dense(1, activation='sigmoid')
-])
+# 4. 데이터 스케일링
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
 
-# 5. 모델 컴파일
-model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+# 5. 모델 정의 및 학습
+model = LogisticRegression(random_state=42)
+model.fit(X_train_scaled, y_train)
 
-# 6. 모델 학습
-model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y_test))
+# 6. 모델 평가
+y_pred = model.predict(X_test_scaled)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy:.2f}")
+print(classification_report(y_test, y_pred))
 
 # 7. 모델 저장 (MinIO에 저장)
 # MinIO 설정
-minio_endpoint = '192.168.49.2:31433'
-access_key = 'minioadmin'  
-secret_key = 'minioadmin' 
+minio_endpoint = 'http://192.168.49.2:31433'
+access_key = 'minioadmin'
+secret_key = 'minioadmin'
 
 s3 = boto3.client('s3',
                   endpoint_url=minio_endpoint,
@@ -118,5 +124,22 @@ s3 = boto3.client('s3',
                   config=Config(signature_version='s3v4'),
                   region_name='us-east-1')
 
-# 모델 로컬에 저장
-model.save('/tmp/saved_model')
+# 모델을 로컬에 저장
+with open('/tmp/saved_model.pkl', 'wb') as f:
+    pickle.dump(model, f)
+
+# MinIO에 업로드
+bucket_name = 'models'
+model_file_path = '/tmp/saved_model.pkl'
+model_object_name = 'churn_model.pkl'
+
+# 버킷이 존재하지 않으면 생성
+try:
+    s3.head_bucket(Bucket=bucket_name)
+except Exception as e:
+    s3.create_bucket(Bucket=bucket_name)
+
+# 모델 파일 업로드
+s3.upload_file(model_file_path, bucket_name, model_object_name)
+
+print("Model saved and uploaded to MinIO successfully.")

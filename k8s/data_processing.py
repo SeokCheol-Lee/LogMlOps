@@ -1,5 +1,5 @@
 import pandas as pd
-from elasticsearch import Elasticsearch
+from elasticsearch7 import Elasticsearch
 from datetime import datetime, timedelta
 from pytz import timezone
 
