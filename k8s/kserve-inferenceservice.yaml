@@ -5,8 +5,11 @@ metadata:
   namespace: kserve
 spec:
   predictor:
-    tensorflow:
-      storageUri: "s3://ai-bucket/saved_model.joblib"
-      runtimeVersion: "2.4.1"
-    minReplicas: 1
-    maxReplicas: 5
+    model:
+      modelFormat:
+        name: sklearn
+      storageUri: s3://ai-bucket/saved_model.joblib
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi

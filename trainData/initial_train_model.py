@@ -87,7 +87,7 @@ with open('/tmp/saved_model.pkl', 'wb') as f:
     pickle.dump(model, f)
 
 # MinIO에 업로드
-bucket_name = 'models'
+bucket_name = 'ai-bucket'
 model_file_path = '/tmp/saved_model.pkl'
 model_object_name = 'churn_model.pkl'
 

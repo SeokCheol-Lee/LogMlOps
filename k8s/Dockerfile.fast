@@ -1,0 +1,20 @@
+# 기존의 Python 기반 이미지 가져오기
+FROM python:3.10
+
+# 작업 디렉터리 설정
+WORKDIR /app
+
+# 필요한 파일들 복사
+COPY requirements.txt /app/requirements.txt
+COPY . /app
+
+# 패키지 설치 및 최신 버전으로 업그레이드
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
+RUN pip install --no-cache-dir --upgrade elasticsearch7
+RUN pip install scikit-learn  # scikit-learn 추가
+
+# 포트 설정
+EXPOSE 80
+
+# 앱 실행 명령
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]

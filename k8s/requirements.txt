@@ -1,0 +1,10 @@
+fastapi
+pandas
+numpy
+elasticsearch7
+pytz
+minio
+uvicorn
+pickle-mixin
+typing-extensions
+scikit-learn

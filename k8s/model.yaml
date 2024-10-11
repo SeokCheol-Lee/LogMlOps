@@ -1,0 +1,56 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"serving.kserve.io/v1beta1","kind":"InferenceService","metadata":{"annotations":{},"name":"model","namespace":"kserve"},"spec":{"predictor":{"sklearn":{"image":"kserve/sklearnserver:v1.0.0","storageUri":"s3://ai-bucket/saved_model.joblib"}}}}
+  creationTimestamp: "2024-10-11T09:14:03Z"
+  finalizers:
+  - inferenceservice.finalizers
+  generation: 2
+  name: model
+  namespace: kserve
+  resourceVersion: "21966"
+  uid: a4ba925f-5887-44c4-9619-7e155dd1c2c2
+spec:
+  predictor:
+    sklearn:
+      image: kserve/sklearnserver:v1.0.0
+      name: ""
+      resources: {}
+      storageUri: s3://ai-bucket/saved_model.joblib
+status:
+  components:
+    predictor:
+      latestCreatedRevision: model-predictor-default-00001
+  conditions:
+  - lastTransitionTime: "2024-10-11T09:14:13Z"
+    message: 'Revision "model-predictor-default-00001" failed with message: Unable
+      to fetch image "kserve/sklearnserver:v1.0.0": failed to resolve image to digest:
+      Get "https://index.docker.io/v2/": context deadline exceeded.'
+    reason: RevisionFailed
+    severity: Info
+    status: "False"
+    type: PredictorConfigurationReady
+  - lastTransitionTime: "2024-10-11T09:14:13Z"
+    message: Configuration "model-predictor-default" does not have any ready Revision.
+    reason: RevisionMissing
+    status: "False"
+    type: PredictorReady
+  - lastTransitionTime: "2024-10-11T09:14:13Z"
+    message: Configuration "model-predictor-default" does not have any ready Revision.
+    reason: RevisionMissing
+    severity: Info
+    status: "False"
+    type: PredictorRouteReady
+  - lastTransitionTime: "2024-10-11T09:14:13Z"
+    message: Configuration "model-predictor-default" does not have any ready Revision.
+    reason: RevisionMissing
+    status: "False"
+    type: Ready
+  modelStatus:
+    states:
+      activeModelState: ""
+      targetModelState: Pending
+    transitionStatus: InProgress
+  observedGeneration: 1

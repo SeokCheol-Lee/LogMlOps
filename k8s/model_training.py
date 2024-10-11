@@ -128,10 +128,21 @@ s3 = boto3.client('s3',
 with open('/tmp/saved_model.pkl', 'wb') as f:
     pickle.dump(model, f)
 
+# 스케일러를 로컬에 저장
+with open('/tmp/scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+
+# 특징 목록 저장
+feature_columns = X.columns.tolist()
+with open('/tmp/feature_columns.pkl', 'wb') as f:
+    pickle.dump(feature_columns, f)
+
 # MinIO에 업로드
 bucket_name = 'models'
 model_file_path = '/tmp/saved_model.pkl'
 model_object_name = 'churn_model.pkl'
+scaler_file_path = '/tmp/scaler.pkl'
+scaler_object_name = 'scaler.pkl'
 
 # 버킷이 존재하지 않으면 생성
 try:
@@ -141,5 +152,9 @@ except Exception as e:
 
 # 모델 파일 업로드
 s3.upload_file(model_file_path, bucket_name, model_object_name)
+# 스케일러 파일 업로드
+s3.upload_file(scaler_file_path, bucket_name, scaler_object_name)
+# 특징 목록 파일 업로드
+s3.upload_file(feature_columns_file_path, bucket_name, feature_columns_object_name)
 
 print("Model saved and uploaded to MinIO successfully.")

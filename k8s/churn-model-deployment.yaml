@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: churn-model-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: churn-model
+  template:
+    metadata:
+      labels:
+        app: churn-model
+    spec:
+      containers:
+      - name: churn-model-container
+        image: vamlin/fast:1.0.11
+        ports:
+        - containerPort: 80
+        env:
+        - name: MINIO_ENDPOINT
+          value: "http://minio-service:9000"  # MinIO 서비스 이름으로 변경
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: MINIO_ACCESS_KEY
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: minio-credentials
+              key: MINIO_SECRET_KEY
