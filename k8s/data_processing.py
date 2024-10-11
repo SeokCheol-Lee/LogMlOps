@@ -1,36 +1,33 @@
 import pandas as pd
 from elasticsearch import Elasticsearch
 from datetime import datetime, timedelta
+from pytz import timezone
 
 # Elasticsearch 연결 설정
-es = Elasticsearch(hosts=["http://elasticsearch-service:9200"])
+es = Elasticsearch(hosts=["192.168.49.2:32377"])
 
 # 시간 범위 설정 (예: 최근 1일)
-end_time = datetime.now()
+utc_time = datetime.now(timezone('UTC'))
+utc_plus_9 = timezone('Asia/Seoul')
+end_time = utc_time.astimezone(utc_plus_9)
 start_time = end_time - timedelta(days=1)
-start_time_iso = start_time.isoformat()
-end_time_iso = end_time.isoformat()
 
-# Elasticsearch 쿼리 설정
-query = {
-    "query": {
-        "range": {
-            "timestamp": {
-                "gte": start_time_iso,
-                "lte": end_time_iso
-            }
+# Elasticsearch 쿼리 정의
+query_body = {
+    "range": {
+        "@timestamp": {
+            "gte": start_time,
+            "lte": end_time
         }
-    },
-    "size": 10000
+    }
 }
 
-index_name = "action_logs"
-
-# 데이터 수집
-res = es.search(index=index_name, body=query, scroll='2m')
+# 데이터 검색 (query와 size 파라미터로 수정)
+res = es.search(index=index_name, query=query_body, scroll='2m', size=10000)
 scroll_id = res['_scroll_id']
 hits = res['hits']['hits']
 
+# 모든 데이터 수집
 all_hits = []
 all_hits.extend(hits)
 
@@ -48,7 +45,7 @@ for hit in all_hits:
     data_list.append({
         'playerId': source['playerId'],
         'actionType': source['actionType'],
-        'timestamp': source['timestamp']
+        '@timestamp': source['@timestamp']
     })
 
 data = pd.DataFrame(data_list)

@@ -6,7 +6,7 @@ metadata:
 spec:
   predictor:
     tensorflow:
-      storageUri: "s3://model-bucket/saved_model.joblib"
+      storageUri: "s3://ai-bucket/saved_model.joblib"
       runtimeVersion: "2.4.1"
     minReplicas: 1
     maxReplicas: 5

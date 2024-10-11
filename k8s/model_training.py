@@ -9,12 +9,15 @@ from datetime import datetime, timedelta
 import boto3
 from botocore.client import Config
 import tarfile
+from pytz import timezone
 
 # 1. Elasticsearch에서 데이터 로드
-es = Elasticsearch(hosts=["http://elasticsearch-service:9200"])
+es = Elasticsearch(hosts=["192.168.49.2:32377"])
 
 # 예시로 최근 30일 간의 데이터를 가져옵니다.
-end_time = datetime.now()
+utc_time = datetime.now(timezone('UTC'))
+utc_plus_9 = timezone('Asia/Seoul')
+end_time = utc_time.astimezone(utc_plus_9)
 start_time = end_time - timedelta(days=30)
 
 # 시간 범위를 ISO 포맷으로 변환
@@ -22,22 +25,17 @@ start_time_iso = start_time.isoformat()
 end_time_iso = end_time.isoformat()
 
 # Elasticsearch 쿼리 정의
-query = {
-    "query": {
-        "range": {
-            "timestamp": {
-                "gte": start_time_iso,
-                "lte": end_time_iso
-            }
+query_body = {
+    "range": {
+        "@timestamp": {
+            "gte": start_time_iso,
+            "lte": end_time_iso
         }
-    },
-    "size": 10000  # 필요한 경우 조정하거나 Scroll API 사용
+    }
 }
 
-index_name = "action_logs"  # 실제 인덱스 이름으로 변경
-
-# 데이터 검색
-res = es.search(index=index_name, body=query, scroll='2m')
+# 데이터 검색 (query와 size 파라미터로 수정)
+res = es.search(index=index_name, query=query_body, scroll='2m', size=10000)
 scroll_id = res['_scroll_id']
 hits = res['hits']['hits']
 
@@ -59,7 +57,7 @@ for hit in all_hits:
     data_list.append({
         'playerId': source['playerId'],
         'actionType': source['actionType'],
-        'timestamp': source['timestamp']
+        '@timestamp': source['@timestamp']
     })
 
 data = pd.DataFrame(data_list)
@@ -67,7 +65,7 @@ data = pd.DataFrame(data_list)
 # 2. 데이터 전처리
 
 # timestamp를 datetime 형식으로 변환
-data['timestamp'] = pd.to_datetime(data['timestamp'])
+data['@timestamp'] = pd.to_datetime(data['@timestamp'])
 
 # 액션 카운트 계산
 action_counts = data.groupby('playerId').size().reset_index(name='action_count')
@@ -76,8 +74,8 @@ action_counts = data.groupby('playerId').size().reset_index(name='action_count')
 action_type_counts = data.groupby(['playerId', 'actionType']).size().unstack(fill_value=0).reset_index()
 
 # 마지막 액션 시점 계산
-last_action = data.groupby('playerId')['timestamp'].max().reset_index()
-last_action['recency'] = (end_time - last_action['timestamp']).dt.days
+last_action = data.groupby('playerId')['@timestamp'].max().reset_index()
+last_action['recency'] = (end_time - last_action['@timestamp']).dt.days
 
 # 특징 데이터 결합
 features = action_counts.merge(action_type_counts, on='playerId')
@@ -109,9 +107,9 @@ model.fit(X_train, y_train, epochs=10, batch_size=32, validation_data=(X_test, y
 
 # 7. 모델 저장 (MinIO에 저장)
 # MinIO 설정
-minio_endpoint = 'http://minio-service:9000'
-access_key = 'minioadmin'  # 실제 액세스 키로 변경
-secret_key = 'minioadmin'  # 실제 시크릿 키로 변경
+minio_endpoint = '192.168.49.2:31433'
+access_key = 'minioadmin'  
+secret_key = 'minioadmin' 
 
 s3 = boto3.client('s3',
                   endpoint_url=minio_endpoint,
@@ -122,13 +120,3 @@ s3 = boto3.client('s3',
 
 # 모델 로컬에 저장
 model.save('/tmp/saved_model')
-
-# 모델을 tar.gz로 압축
-model_tar_path = '/tmp/saved_model.tar.gz'
-with tarfile.open(model_tar_path, "w:gz") as tar:
-    tar.add('/tmp/saved_model', arcname='saved_model')
-
-# MinIO에 업로드
-bucket_name = 'model-bucket'  # 실제 버킷 이름으로 변경
-s3.upload_file(model_tar_path, bucket_name, 'saved_model.tar.gz')
-
