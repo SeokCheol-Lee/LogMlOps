@@ -1,0 +1,8 @@
+istio-1.23.2
+jobs
+plugins
+*.pem
+*.crt
+*.csr
+*.key
+*.cnf

@@ -7,5 +7,5 @@
 /dataSources/
 /dataSources.local.xml
 
-../k8s/istio-1.23.2/
+../k
 ../k8s/secret.key
