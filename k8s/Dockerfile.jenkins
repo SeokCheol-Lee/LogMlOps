@@ -1,0 +1,25 @@
+FROM jenkins/jenkins:lts
+
+USER root
+
+# Update package list and install required dependencies
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-dev \
+    libssl-dev \
+    libffi-dev \
+    build-essential \
+    python3-venv
+
+# 가상 환경 생성
+RUN python3 -m venv /opt/venv
+
+# 가상 환경 활성화 및 패키지 설치
+RUN /opt/venv/bin/pip install --upgrade pip
+RUN /opt/venv/bin/pip install pandas numpy scikit-learn elasticsearch7 joblib boto3 pytz
+
+# Jenkins 사용자가 가상 환경을 사용하도록 설정
+ENV PATH="/opt/venv/bin:$PATH"
+
+USER jenkins

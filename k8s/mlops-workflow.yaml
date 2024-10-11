@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: mlops-pipeline-
+spec:
+  entrypoint: mlops-pipeline
+  templates:
+    - name: mlops-pipeline
+      steps:
+        - - name: data-processing
+            template: data-processing
+        - - name: docker-build-push
+            template: docker-build-push
+        - - name: model-training
+            template: model-training
+        - - name: deploy-model
+            template: deploy-model
+
+    - name: data-processing
+      container:
+        image: python:3.8-slim
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            pip install pandas elasticsearch
+            python /scripts/data_processing.py
+
+        volumeMounts:
+          - name: scripts
+            mountPath: /scripts
+
+    - name: docker-build-push
+      container:
+        image: docker:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            docker build -t your-docker-repo/model_training:latest /path/to/dockerfile
+            docker push your-docker-repo/model_training:latest
+
+        volumeMounts:
+          - name: docker-sock
+            mountPath: /var/run/docker.sock
+
+    - name: model-training
+      container:
+        image: your-docker-repo/model_training:latest
+        command: ["python", "model_training.py"]
+
+    - name: deploy-model
+      container:
+        image: bitnami/kubectl:latest
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            kubectl apply -f /manifests/kserve-inferenceservice.yaml
+
+        volumeMounts:
+          - name: manifests
+            mountPath: /manifests
+
+  volumes:
+    - name: scripts
+      configMap:
+        name: mlops-scripts
+    - name: manifests
+      configMap:
+        name: mlops-manifests
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock

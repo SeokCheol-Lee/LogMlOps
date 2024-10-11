@@ -1,0 +1,12 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: model
+  namespace: kserve
+spec:
+  predictor:
+    tensorflow:
+      storageUri: "s3://model-bucket/saved_model.joblib"
+      runtimeVersion: "2.4.1"
+    minReplicas: 1
+    maxReplicas: 5

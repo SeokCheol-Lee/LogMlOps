@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: model-retraining-cronjob
+spec:
+  schedule: "0 0 * * *" # 매일 자정에 실행
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: model-retraining
+              image: vamlin/model_training:latest
+              command: ["python", "model_training.py"]
+          restartPolicy: OnFailure
