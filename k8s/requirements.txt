@@ -8,3 +8,4 @@ uvicorn
 pickle-mixin
 typing-extensions
 scikit-learn
+prometheus_client

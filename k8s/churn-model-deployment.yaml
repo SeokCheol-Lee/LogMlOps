@@ -11,12 +11,16 @@ spec:
     metadata:
       labels:
         app: churn-model
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/metrics"
+        prometheus.io/port: "80"
     spec:
       containers:
       - name: churn-model-container
-        image: vamlin/fast:1.0.11
+        image: vamlin/fast:1.0.19
         ports:
-        - containerPort: 80
+        - containerPort: 8000
         env:
         - name: MINIO_ENDPOINT
           value: "http://minio-service:9000"  # MinIO 서비스 이름으로 변경

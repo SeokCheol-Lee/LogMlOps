@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, Response, HTTPException
 import pandas as pd
 import numpy as np
 from elasticsearch7 import Elasticsearch
@@ -8,6 +8,12 @@ from minio import Minio
 import pickle
 import os
 import logging
+from prometheus_client import Summary, generate_latest, CONTENT_TYPE_LATEST
+import random
+import time
+
+# 메트릭 정의
+REQUEST_TIME = Summary('request_processing_seconds', 'Time spent processing request')
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -17,17 +23,16 @@ app = FastAPI()
 # Elasticsearch 설정
 es = Elasticsearch(hosts=["192.168.49.2:32377"])
 
-# 올바른 Minio 클라이언트 초기화
+# Minio 클라이언트 설정
 minio_endpoint = '192.168.49.2:31433'  
 access_key = 'minioadmin'
 secret_key = 'minioadmin'
 
-# Minio 클라이언트 설정
 minio_client = Minio(
     minio_endpoint,
     access_key=access_key,
     secret_key=secret_key,
-    secure=False  # HTTP 사용 시 secure=False
+    secure=False
 )
 
 # MinIO에서 객체 로드 함수
@@ -54,6 +59,18 @@ model = load_from_minio('churn_model.pkl')
 scaler = load_from_minio('scaler.pkl')
 feature_columns = load_from_minio('feature_columns.pkl')
 logging.info("Successfully loaded model, scaler, and feature columns.")
+
+@app.middleware("http")
+async def add_prometheus_metrics(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    process_time = time.time() - start_time
+    REQUEST_TIME.observe(process_time)
+    return response
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/predict/{playerId}")
 def predict(playerId: int):
@@ -161,3 +178,8 @@ def predict(playerId: int):
     except Exception as e:
         logging.error(f"Error during prediction: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+# 만약 직접 실행할 경우를 대비해 __main__ 블록을 수정 (선택 사항)
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8000)
